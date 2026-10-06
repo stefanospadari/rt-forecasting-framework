@@ -4,7 +4,7 @@ Framework per **training, valutazione e analisi** di modelli di forecasting
 (ARIMA, LSTM) usati come fallback predittivo in pipeline IoT real-time.
 
 Allena e testa modelli di forecasting (ARIMA, LSTM) sul
-dataset KETI (5 stanze, 3 metriche: co2, temperature, humidity), con
+dataset [KETI](https://www.kaggle.com/datasets/ranakrc/smart-building-system) (5 stanze, 3 metriche: co2, temperature, humidity), con
 misura separata di latenza di update/predict per il vincolo real-time
 `T_update(un nuovo campione) + T_forecast ≤ T_s`.
 
