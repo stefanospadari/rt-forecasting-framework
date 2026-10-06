@@ -1,6 +1,9 @@
-# Benchmark forecasting — training & testing
+# rt-forecasting-framework
 
-Pipeline per allenare e testare modelli di forecasting (ARIMA, LSTM) sul
+Framework per **training, valutazione e analisi** di modelli di forecasting
+(ARIMA, LSTM) usati come fallback predittivo in pipeline IoT real-time.
+
+Allena e testa modelli di forecasting (ARIMA, LSTM) sul
 dataset KETI (5 stanze, 3 metriche: co2, temperature, humidity), con
 misura separata di latenza di update/predict per il vincolo real-time
 `T_update(un nuovo campione) + T_forecast ≤ T_s`.
@@ -8,7 +11,7 @@ misura separata di latenza di update/predict per il vincolo real-time
 ## Struttura
 
 ```
-project/
+rt-forecasting-framework/
   README.md
   setup.sh                 # crea le cartelle e verifica dati + container
   configs/
@@ -68,7 +71,7 @@ cartella va comunque eliminata.)
 ## Avvio rapido (nuova macchina / nuovo cluster)
 
 ```bash
-git clone <repo> project && cd project
+git clone <repo> rt-forecasting-framework && cd rt-forecasting-framework
 # 1) dati: scompattare l'archivio KETI in data/archive/KETI/<stanza>/<metrica>.csv
 # 2) (opzionale) modelli già allenati: scompattare in trained_models/
 # 3) container: copiare un tf-gpu.sif esistente in containers/, oppure costruirlo
