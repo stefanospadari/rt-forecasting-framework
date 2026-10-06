@@ -1,19 +1,18 @@
-# data and heavy artifacts: archived separately (e.g. Zenodo), not in Git
-data/
-trained_models/
-logs/
-backup/
+# data and heavy artifacts: NOT in Git.
+# No trailing slash: this also excludes them when they are symbolic links
+/data
+/trained_models
+/logs
+/backup
+/smoke
+/trained_models_smoke
+/results_smoke
+configs/smoke.yaml
 # container: rebuilt from containers/tf-gpu.def
 *.sif
 *.sif.new
-containers/pip-freeze.txt.tmp
 # python
 __pycache__/
 *.pyc
 .venv/
 .ipynb_checkpoints/
-# smoke tests / validation
-smoke/
-trained_models_smoke/
-results_smoke/
-configs/smoke.yaml

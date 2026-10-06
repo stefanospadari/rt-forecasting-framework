@@ -14,6 +14,8 @@ misura separata di latenza di update/predict per il vincolo real-time
 rt-forecasting-framework/
   README.md
   setup.sh                 # crea le cartelle e verifica dati + container
+  scripts/
+    get_data.sh            # scarica e prepara il dataset KETI da Kaggle
   configs/
     base.yaml              # UNICA fonte di verità: percorsi, stanze, modelli, iperparametri
   src/
@@ -49,47 +51,64 @@ Tutti i percorsi in `configs/base.yaml` (`data.path`, `output.path`,
 cartella da cui si lancia lo script. La radice è ricavata da `src/libs/paths.py`
 e si può forzare con la variabile d'ambiente `PROJECT_ROOT`.
 
-## Cartella collegata al vecchio progetto (link simbolici)
+## Avvio rapido (da zero, dopo `git clone`)
 
-Questa cartella è stata inizializzata con `./init_project.sh <vecchio_progetto>`:
-`data/`, `trained_models/` e `containers/tf-gpu.sif` sono **link** ai file della
-vecchia cartella (niente copie). Gli script Slurm montano automaticamente anche
-le destinazioni dei link nel container. Con `ls -l` si vede cosa è un link.
-
-**Rendere il progetto indipendente** (quando si vuole eliminare la vecchia cartella):
-```bash
-for d in data trained_models; do
-  [ -L $d ] && { src=$(readlink -f $d); rm $d; cp -a "$src" $d; }   # lento: copia i dati
-done
-[ -L containers/tf-gpu.sif ] && { src=$(readlink -f containers/tf-gpu.sif); rm containers/tf-gpu.sif; mv "$src" containers/; }
-./setup.sh   # nessuna riga deve più dire "(link)"
-```
-(`mv` sullo stesso filesystem è istantaneo; `cp -a` copia davvero. In alternativa
-a `cp -a` si può usare `mv` anche per data e trained_models, se la vecchia
-cartella va comunque eliminata.)
-
-## Avvio rapido (nuova macchina / nuovo cluster)
+Requisiti sulla macchina: Apptainer ≥ 1.1, driver NVIDIA ≥ 525 (CUDA 12), `curl`, `unzip`.
+Slurm è opzionale (vedi "Senza Slurm" sotto).
 
 ```bash
-git clone <repo> rt-forecasting-framework && cd rt-forecasting-framework
-# 1) dati: scompattare l'archivio KETI in data/archive/KETI/<stanza>/<metrica>.csv
-# 2) (opzionale) modelli già allenati: scompattare in trained_models/
-# 3) container: copiare un tf-gpu.sif esistente in containers/, oppure costruirlo
-./containers/submit_build.sh        # build su partizione sbuild + test GPU automatico
-# 4) verifica
+git clone https://github.com/stefanospadari/rt-forecasting-framework.git
+cd rt-forecasting-framework
+
+# 1) dataset KETI (Kaggle, pubblico) -> data/archive/KETI/<stanza>/<metrica>.csv
+./scripts/get_data.sh
+#    se il download automatico fallisce: scaricare archive.zip da
+#    https://www.kaggle.com/datasets/ranakrc/smart-building-system  e poi
+#    ./scripts/get_data.sh /percorso/archive.zip
+
+# 2) container (solo la prima volta): build + test GPU, ~1-3 h a seconda del disco
+./containers/submit_build.sh          # con Slurm (partizione sbuild: cambiare con sbatch -p, vedi sotto)
+#    senza Slurm:  apptainer build --fakeroot containers/tf-gpu.sif containers/tf-gpu.def
+#                  apptainer exec --nv containers/tf-gpu.sif python /opt/check_gpu.py
+
+# 3) verifica cartelle, dataset, container
 ./setup.sh
+
+# 4) prova end-to-end in piccolo (~10 min): deve finire con "SMOKE END - OK"
+sbatch slurm/smoke.slurm
 ```
+
+Poi training e testing come descritto in "Lanciare con Slurm". I modelli allenati
+non sono nel repository: si ottengono lanciando il training (`trained_models/`).
 
 Il container contiene **solo l'ambiente** (Python 3.10, TensorFlow 2.21,
-Keras 3.12, CUDA 12.x e cuDNN 9 da pip, statsmodels, …). Codice, config, dati
-e modelli restano fuori e vengono montati a runtime: modificare il codice non
-richiede di ricostruire l'immagine.
+Keras 3.12, CUDA 12.x e cuDNN 9 da pip, statsmodels, …), costruito da
+`containers/tf-gpu.def` con le versioni esatte di `containers/requirements.lock.txt`.
+Codice, config, dati e modelli restano fuori e vengono montati a runtime:
+modificare il codice non richiede di ricostruire l'immagine.
 
 > Nota tecnica: i wheel `tensorflow[and-cuda]==2.21.0` non includono
 > `nvidia/cusolver/lib` (né `curand`, `nvrtc`, `nvjitlink`) nel loro RUNPATH,
 > quindi TF non trova `libcusolver.so.11` e scarta la GPU
 > ("Cannot dlopen some GPU libraries"). L'immagine esporta per questo tutte le
 > cartelle `site-packages/nvidia/*/lib` in `LD_LIBRARY_PATH` (vedi `tf-gpu.def`).
+
+### Su un altro cluster
+
+Le partizioni di default negli script (`l40`, `l40s`, `sbuild`) sono quelle del
+cluster DISI UniBo. Su un altro cluster basta passarne una diversa a `sbatch`
+(`sbatch -p <partizione> ...`), oppure cambiare la riga `#SBATCH --partition`
+nello script. `slurm/validate.sh` contiene l'elenco delle partizioni DISI da adattare.
+
+### Senza Slurm (workstation con GPU)
+
+Gli script in `slurm/` funzionano anche come normali script bash, lanciati dalla
+radice del progetto:
+```bash
+METRIC=co2 bash slurm/train.slurm
+METRIC=co2 N_ORIGINS=10 bash slurm/test.slurm
+bash slurm/smoke.slurm
+```
 
 ## `configs/base.yaml`
 
