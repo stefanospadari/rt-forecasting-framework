@@ -1,0 +1,66 @@
+# =====================================================================
+#  tf-gpu.def  -  slim Apptainer image for the Digital Shadow benchmark
+#
+#  Base: Debian 13 (trixie) slim + Python 3.10. glibc >= 2.38 is required by
+#  the fakeroot of the DISI cluster (libfakeroot of the host is injected into the container). CUDA and cuDNN are NOT installed at the
+#  system level: pip installs them via tensorflow[and-cuda], already at the
+#  exact versions for TF 2.21. No LD_LIBRARY_PATH, no cuDNN copied by hand.
+#
+#  Usage:  apptainer exec --nv tf-gpu.sif python training.py ...
+# =====================================================================
+Bootstrap: docker
+From: python:3.10-slim-trixie
+
+%files
+    requirements.lock.txt /opt/requirements.lock.txt
+    check_gpu.py          /opt/check_gpu.py
+
+%post
+    set -eu
+    TF_VERSION=2.21.0
+
+    # From the sandbox lock remove tensorflow and the nvidia-* packages:
+    # tensorflow[and-cuda] decides those versions, otherwise pip goes into conflict
+    # (e.g. the sandbox had nvidia-cuda-nvcc 12.9 next to CUDA 12.5).
+    grep -viE '^(tensorflow|nvidia-)' /opt/requirements.lock.txt > /opt/requirements.filtered.txt
+
+    python -m pip install --no-cache-dir --upgrade pip
+    python -m pip install --no-cache-dir \
+        "tensorflow[and-cuda]==${TF_VERSION}" -r /opt/requirements.filtered.txt
+    python -m pip freeze > /opt/pip-freeze.txt
+
+    # TF 2.21 does not find every pip CUDA library by itself (e.g. libcusolver.so.11):
+    # put all the nvidia/*/lib directories in LD_LIBRARY_PATH, baked into the image.
+    # Apptainer then appends /.singularity.d/libs (host driver, --nv) by itself.
+    NV=$(python -c "import site; print(site.getsitepackages()[0])")/nvidia
+    NV_LIBS=$(ls -d "$NV"/*/lib | paste -sd:)
+    echo "export LD_LIBRARY_PATH=$NV_LIBS\${LD_LIBRARY_PATH:+:\$LD_LIBRARY_PATH}" >> $APPTAINER_ENVIRONMENT
+
+    # ptxas/libdevice (XLA) from the nvidia-cuda-nvcc wheel
+    if [ -d "$NV/cuda_nvcc" ]; then
+        echo "export PATH=$NV/cuda_nvcc/bin:\$PATH"                 >> $APPTAINER_ENVIRONMENT
+        echo "export XLA_FLAGS=--xla_gpu_cuda_data_dir=$NV/cuda_nvcc" >> $APPTAINER_ENVIRONMENT
+    fi
+
+%environment
+    # Apptainer mounts $HOME: never load ~/.local packages
+    export PYTHONNOUSERSITE=1
+    unset PYTHONPATH
+    export TF_CPP_MIN_LOG_LEVEL=1
+    export TF_FORCE_GPU_ALLOW_GROWTH=true
+    export MPLBACKEND=Agg
+    export MPLCONFIGDIR=/tmp/mpl-$USER
+    export LC_ALL=C.UTF-8 LANG=C.UTF-8
+
+%runscript
+    exec python "$@"
+
+%test
+    python -c "import tensorflow as tf; print('TF', tf.__version__, '| CUDA', tf.sysconfig.get_build_info()['cuda_version'])"
+    python -m pip list 2>/dev/null | grep -iE '^nvidia-(cudnn|cuda-runtime|cublas|cusolver)'
+    # the library that TF did not find: it must be resolvable through LD_LIBRARY_PATH
+    python -c "import ctypes; ctypes.CDLL('libcusolver.so.11'); ctypes.CDLL('libcudnn.so.9'); print('CUDA libs in LD_LIBRARY_PATH: OK')"
+
+%labels
+    Author Stefano Spadari
+    Purpose Digital Shadow forecasting benchmark (ARIMA/LSTM)

@@ -1,0 +1,19 @@
+# data and heavy artifacts: archived separately (e.g. Zenodo), not in Git
+data/
+trained_models/
+logs/
+backup/
+# container: rebuilt from containers/tf-gpu.def
+*.sif
+*.sif.new
+containers/pip-freeze.txt.tmp
+# python
+__pycache__/
+*.pyc
+.venv/
+.ipynb_checkpoints/
+# smoke tests / validation
+smoke/
+trained_models_smoke/
+results_smoke/
+configs/smoke.yaml

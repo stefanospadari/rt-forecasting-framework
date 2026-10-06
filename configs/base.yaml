@@ -1,0 +1,206 @@
+data:
+  path: data/archive/KETI      # relative to the project root
+  rooms:
+  - 413
+  - 419
+  - 442
+  - 510
+  - 621
+  freq: 1min
+  interpolate: true
+  train_ratio: 0.8
+training:
+  seed: 42
+output:
+  path: trained_models         # relative to the project root
+  results_path: results        # aggregated CSVs from testing.py
+models:
+- name: ARIMA_311
+  builder: ArimaForecaster
+  params:
+    order: [3, 1, 1]
+- name: ARIMA_511_FFT
+  builder: ArimaForecaster
+  params:
+    order: [5, 1, 2]
+    fourier_params:
+      period: 1440
+      K: 3
+- name: LSTM_DENSE_SMALL_W60_H1
+  builder: LSTMForecaster
+  params:
+    model_func: lstm_dense
+    model_params: {units: 32, dense_units: 32}
+    train_params:
+      batch_size: 32
+      epochs: 5
+      learning_rate: 0.001
+      validation_split: 0.2
+      clipnorm: 1.0
+    window: 60
+    output_steps: 1
+- name: LSTM_DENSE_SMALL_W60_H30
+  builder: LSTMForecaster
+  params:
+    model_func: lstm_dense
+    model_params: {units: 32, dense_units: 32}
+    train_params:
+      batch_size: 32
+      epochs: 200
+      early_stopping: {monitor: val_loss, patience: 10, restore_best_weights: true}
+      reduce_lr: {monitor: val_loss, factor: 0.5, patience: 5, min_lr: 1.0e-06}
+      learning_rate: 0.001
+      validation_split: 0.2
+      clipnorm: 1.0
+    window: 60
+    output_steps: 30
+- name: LSTM_DENSE_SMALL_W60_H60
+  builder: LSTMForecaster
+  params:
+    model_func: lstm_dense
+    model_params: {units: 32, dense_units: 32}
+    train_params:
+      batch_size: 32
+      epochs: 200
+      early_stopping: {monitor: val_loss, patience: 10, restore_best_weights: true}
+      reduce_lr: {monitor: val_loss, factor: 0.5, patience: 5, min_lr: 1.0e-06}
+      learning_rate: 0.001
+      validation_split: 0.2
+      clipnorm: 1.0
+    window: 60
+    output_steps: 60
+- name: LSTM_DENSE_MED_W60_H1
+  builder: LSTMForecaster
+  params:
+    model_func: lstm_dense
+    model_params: {units: 128, dense_units: 128}
+    train_params:
+      batch_size: 32
+      epochs: 200
+      early_stopping: {monitor: val_loss, patience: 10, restore_best_weights: true}
+      reduce_lr: {monitor: val_loss, factor: 0.5, patience: 5, min_lr: 1.0e-06}
+      learning_rate: 0.001
+      validation_split: 0.2
+      clipnorm: 1.0
+    window: 60
+    output_steps: 1
+- name: LSTM_DENSE_MED_W120_H1
+  builder: LSTMForecaster
+  params:
+    model_func: lstm_dense
+    model_params: {units: 128, dense_units: 128}
+    train_params:
+      batch_size: 32
+      epochs: 200
+      early_stopping: {monitor: val_loss, patience: 10, restore_best_weights: true}
+      reduce_lr: {monitor: val_loss, factor: 0.5, patience: 5, min_lr: 1.0e-06}
+      learning_rate: 0.001
+      validation_split: 0.2
+      clipnorm: 1.0
+    window: 120
+    output_steps: 1
+- name: LSTM_DENSE_MED_W240_H1
+  builder: LSTMForecaster
+  params:
+    model_func: lstm_dense
+    model_params: {units: 128, dense_units: 128}
+    train_params:
+      batch_size: 32
+      epochs: 200
+      early_stopping: {monitor: val_loss, patience: 10, restore_best_weights: true}
+      reduce_lr: {monitor: val_loss, factor: 0.5, patience: 5, min_lr: 1.0e-06}
+      learning_rate: 0.001
+      validation_split: 0.2
+      clipnorm: 1.0
+    window: 240
+    output_steps: 1
+- name: LSTM_DENSE_MED_W60_H30
+  builder: LSTMForecaster
+  params:
+    model_func: lstm_dense
+    model_params: {units: 128, dense_units: 128}
+    train_params:
+      batch_size: 32
+      epochs: 200
+      early_stopping: {monitor: val_loss, patience: 10, restore_best_weights: true}
+      reduce_lr: {monitor: val_loss, factor: 0.5, patience: 5, min_lr: 1.0e-06}
+      learning_rate: 0.001
+      validation_split: 0.2
+      clipnorm: 1.0
+    window: 60
+    output_steps: 30
+- name: LSTM_DENSE_MED_W120_H30
+  builder: LSTMForecaster
+  params:
+    model_func: lstm_dense
+    model_params: {units: 128, dense_units: 128}
+    train_params:
+      batch_size: 32
+      epochs: 200
+      early_stopping: {monitor: val_loss, patience: 10, restore_best_weights: true}
+      reduce_lr: {monitor: val_loss, factor: 0.5, patience: 5, min_lr: 1.0e-06}
+      learning_rate: 0.001
+      validation_split: 0.2
+      clipnorm: 1.0
+    window: 120
+    output_steps: 30
+- name: LSTM_DENSE_MED_W240_H30
+  builder: LSTMForecaster
+  params:
+    model_func: lstm_dense
+    model_params: {units: 128, dense_units: 128}
+    train_params:
+      batch_size: 32
+      epochs: 200
+      early_stopping: {monitor: val_loss, patience: 10, restore_best_weights: true}
+      reduce_lr: {monitor: val_loss, factor: 0.5, patience: 5, min_lr: 1.0e-06}
+      learning_rate: 0.001
+      validation_split: 0.2
+      clipnorm: 1.0
+    window: 240
+    output_steps: 30
+- name: LSTM_DENSE_MED_W60_H60
+  builder: LSTMForecaster
+  params:
+    model_func: lstm_dense
+    model_params: {units: 128, dense_units: 128}
+    train_params:
+      batch_size: 32
+      epochs: 200
+      early_stopping: {monitor: val_loss, patience: 10, restore_best_weights: true}
+      reduce_lr: {monitor: val_loss, factor: 0.5, patience: 5, min_lr: 1.0e-06}
+      learning_rate: 0.001
+      validation_split: 0.2
+      clipnorm: 1.0
+    window: 60
+    output_steps: 60
+- name: LSTM_DENSE_MED_W120_H60
+  builder: LSTMForecaster
+  params:
+    model_func: lstm_dense
+    model_params: {units: 128, dense_units: 128}
+    train_params:
+      batch_size: 32
+      epochs: 200
+      early_stopping: {monitor: val_loss, patience: 10, restore_best_weights: true}
+      reduce_lr: {monitor: val_loss, factor: 0.5, patience: 5, min_lr: 1.0e-06}
+      learning_rate: 0.001
+      validation_split: 0.2
+      clipnorm: 1.0
+    window: 120
+    output_steps: 60
+- name: LSTM_DENSE_MED_W240_H60
+  builder: LSTMForecaster
+  params:
+    model_func: lstm_dense
+    model_params: {units: 128, dense_units: 128}
+    train_params:
+      batch_size: 32
+      epochs: 200
+      early_stopping: {monitor: val_loss, patience: 10, restore_best_weights: true}
+      reduce_lr: {monitor: val_loss, factor: 0.5, patience: 5, min_lr: 1.0e-06}
+      learning_rate: 0.001
+      validation_split: 0.2
+      clipnorm: 1.0
+    window: 240
+    output_steps: 60
