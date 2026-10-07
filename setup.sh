@@ -3,6 +3,7 @@
 # and checks that data and container are there. It changes no existing files.
 set -uo pipefail
 cd "$(dirname "$0")"
+# Usage: ./setup.sh [config]   (default configs/base.yaml)
 ROOT=$PWD
 ok(){ echo "  [ok]  $*"; }; ko(){ echo "  [!!]  $*"; MISSING=1; }
 MISSING=0
@@ -14,15 +15,19 @@ for d in data trained_models results logs; do
   if [ -L "$d" ]; then ok "$d/ -> $(readlink -f "$d")  (link)"; else ok "$d/"; fi
 done
 
-echo "== Dataset (data/archive/KETI/<room>/<metric>.csv)"
-ROOMS=$(python3 -c "import yaml;print(*yaml.safe_load(open('configs/base.yaml'))['data']['rooms'])" 2>/dev/null || echo "413 419 442 510 621")
-for r in $ROOMS; do
-  for m in co2 temperature humidity; do
-    f=data/archive/KETI/$r/$m.csv
-    [ -s "$f" ] || ko "missing $f"
-  done
-done
-[ "$MISSING" = 0 ] && ok "all CSVs present for rooms: $ROOMS"
+CONFIG=${1:-configs/base.yaml}
+echo "== Dataset (from $CONFIG: <data.path>/<room>/<metric>.csv)"
+if INFO=$(python3 scripts/config_info.py "$CONFIG" 2>/dev/null); then
+  DPATH=$(sed -n 1p <<< "$INFO"); ROOMS=$(sed -n 2p <<< "$INFO"); METRICS=$(sed -n 3p <<< "$INFO")
+  DMISS=0
+  for r in $ROOMS; do for m in $METRICS; do
+    [ -s "$DPATH/$r/$m.csv" ] || { ko "missing $DPATH/$r/$m.csv"; DMISS=1; }
+  done; done
+  [ "$DMISS" = 0 ] && ok "rooms: $ROOMS | metrics: $METRICS"
+else
+  echo "  [--]  check skipped: python3 + PyYAML are not available on this host"
+  echo "        (the jobs check the data anyway when they start)"
+fi
 
 echo "== Container"
 if [ -f containers/tf-gpu.sif ]; then ok "containers/tf-gpu.sif ($(du -hL containers/tf-gpu.sif | cut -f1))$([ -L containers/tf-gpu.sif ] && echo "  (link)")"

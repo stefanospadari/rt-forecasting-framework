@@ -19,6 +19,7 @@ from libs.lstm_utils import (
 )
 from libs.data_utils import prepare_dataset
 from libs.paths import PROJECT_ROOT, project_path, config_path
+from libs.config_utils import resolve_metric, resolve_rooms
 
 
 # ============================================================
@@ -85,26 +86,11 @@ set_seeds(config["training"]["seed"])
 data_cfg = config["data"]
 output_cfg = config["output"]
 
-if args.metric is not None:
-    data_cfg["metric"] = args.metric
+metric = resolve_metric(data_cfg, args.metric)
+rooms = resolve_rooms(data_cfg, args.room)
 
-    metric_limits = {
-        "temperature": (0, 50),
-        "humidity": (0, 100),
-        "co2": (0, 2000),
-    }
-
-    if args.metric not in metric_limits:
-        raise ValueError(f"Unsupported metric: {args.metric}")
-
-    data_cfg["min_val"], data_cfg["max_val"] = metric_limits[args.metric]
-
-rooms = data_cfg["rooms"]
-
-if args.room is not None:
-    rooms = [int(args.room)]
-
-metric = data_cfg["metric"]
+print(f"Metric: {metric} (valid range: {data_cfg['min_val']} .. {data_cfg['max_val']})")
+print(f"Rooms:  {rooms}")
 
 for room in rooms:
 

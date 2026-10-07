@@ -3,7 +3,7 @@
 #SBATCH --partition=sbuild
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=6000
-#SBATCH --time=04:00:00
+#SBATCH --time=12:00:00
 #SBATCH --output=logs/build_%j.log
 #
 # Build tf-gpu.sif. From the project root:

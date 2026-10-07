@@ -6,6 +6,7 @@ import yaml
 
 from libs.data_utils import prepare_dataset
 from libs.paths import PROJECT_ROOT, project_path, config_path
+from libs.config_utils import resolve_metric, resolve_rooms, evaluation_settings
 from libs.arima_utils import ArimaForecaster
 from libs.lstm_utils import LSTMForecaster
 from libs.benchmark_utils import (
@@ -25,7 +26,10 @@ from libs.benchmark_utils import (
 parser = argparse.ArgumentParser()
 parser.add_argument("--config", type=str, default="configs/base.yaml")
 parser.add_argument("--metric", type=str, default=None)
-parser.add_argument("--n-origins", type=int, default=100)
+parser.add_argument("--n-origins", type=int, default=None,
+                    help="forecast origins per room x model x horizon (default: evaluation.n_origins)")
+parser.add_argument("--room", type=str, default=None,
+                    help="evaluate only this room (default: all data.rooms)")
 args = parser.parse_args()
 
 
@@ -49,23 +53,13 @@ print(f"Project root:         {PROJECT_ROOT}")
 data_cfg = config["data"]
 output_cfg = config["output"]
 
-if args.metric is not None:
-    data_cfg["metric"] = args.metric
-    metric_limits = {
-        "temperature": (0, 50),
-        "humidity": (0, 100),
-        "co2": (0, 2000),
-    }
-    if args.metric not in metric_limits:
-        raise ValueError(f"Unsupported metric: {args.metric}")
-    data_cfg["min_val"], data_cfg["max_val"] = metric_limits[args.metric]
+metric = resolve_metric(data_cfg, args.metric)
+rooms = resolve_rooms(data_cfg, args.room)
 
-rooms = data_cfg["rooms"]
-metric = data_cfg["metric"]
-
-H_test = [1, 10, 30, 60]
-N_SPARSE = args.n_origins
-DELTA_T_SEC = 60.0
+eval_cfg = evaluation_settings(config, args.n_origins)
+H_test = eval_cfg["horizons"]
+N_SPARSE = eval_cfg["n_origins"]
+DELTA_T_SEC = eval_cfg["delta_t_sec"]
 
 results_rows = []
 
@@ -84,6 +78,7 @@ print(f"\nRooms: {rooms}")
 print(f"Metric: {metric}")
 print(f"Horizons: {H_test}")
 print(f"Sparse predictions per horizon: {N_SPARSE}")
+print(f"Sampling interval (delta_t): {DELTA_T_SEC} s")
 
 
 # ============================================================
@@ -386,9 +381,8 @@ else:
 results_dir = project_path(output_cfg.get("results_path", "results"))
 results_dir.mkdir(parents=True, exist_ok=True)
 
-output_file = results_dir / (
-    f"benchmark_results_sparse_{metric}" + ("" if N_SPARSE == 100 else f"_n{N_SPARSE}") + ".csv"
-)
+suffix = ("" if eval_cfg["is_default_n"] else f"_n{N_SPARSE}") + (f"_room{args.room}" if args.room else "")
+output_file = results_dir / f"benchmark_results_sparse_{metric}{suffix}.csv"
 
 df_results.to_csv(output_file, index=False)
 

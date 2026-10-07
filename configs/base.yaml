@@ -6,11 +6,22 @@ data:
   - 442
   - 510
   - 621
+  # Metrics that can be passed with --metric. Each one must exist as
+  # <data.path>/<room>/<metric>.csv. min_val/max_val (optional): values outside
+  # the range are treated as sensor errors and dropped before interpolation.
+  metrics:
+    temperature: {min_val: 0, max_val: 50}
+    humidity:    {min_val: 0, max_val: 100}
+    co2:         {min_val: 0, max_val: 2000}
   freq: 1min
   interpolate: true
   train_ratio: 0.8
 training:
   seed: 42
+evaluation:
+  horizons: [1, 10, 30, 60]   # forecast horizons H (steps) evaluated by testing.py
+  delta_t_sec: 60             # sampling interval: real-time budget for the feasibility ratio (P95 / delta_t)
+  n_origins: 100              # forecast origins per room x model x horizon (override: --n-origins)
 output:
   path: trained_models         # relative to the project root
   results_path: results        # aggregated CSVs from testing.py

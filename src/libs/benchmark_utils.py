@@ -149,14 +149,14 @@ def rolling_predict(
 
             update_data = test_series.iloc[current_pos:target_pos]
 
-            # Catch-up non cronometrato: incorpora tutto il gap tranne
-            # l'ultimo punto. Necessario per il walk-forward sparso ma
-            # NON rappresentativo del costo per-ciclo real-time.
+            # Untimed catch-up: absorb the whole gap except the last point.
+            # Needed by the sparse walk-forward, but NOT representative of
+            # the real-time per-cycle cost.
             if chunk_size > 1:
                 model_copy.update(update_data.iloc[:-1])
 
-            # Update cronometrato: un solo nuovo campione, come nel
-            # deployment reale (un valore per intervallo di campionamento).
+            # Timed update: a single new sample, as in the real deployment
+            # (one value per sampling interval).
             last_point = update_data.iloc[[-1]]
 
             if measure_latency:
@@ -288,15 +288,13 @@ def plot_rolling_forecast(
 
         origin_value = test_series.loc[origin]
 
-        # 1. Creiamo la lista delle date (asse X)
-        # Mettiamo origin in una lista e gli sommiamo le altre date convertite in lista
+        # 1. X axis: the origin timestamp followed by the forecast timestamps
         x_axis = [pd.to_datetime(origin)] + pd.to_datetime(forecast_index).tolist()
 
-        # 2. Creiamo la lista dei valori (asse Y)
-        # Prendiamo il valore singolo e gli sommiamo i valori del forecast convertiti in lista
+        # 2. Y axis: the observed value at the origin followed by the forecast values
         y_axis = [origin_value] + list(forecast_values.flatten())
 
-        # 3. Controlliamo se hanno la stessa lunghezza (entrambi devono essere 11 se H=10)
+        # 3. Both lists must have the same length (H + 1, e.g. 11 for H=10)
         if len(x_axis) == len(y_axis):
             plt.plot(
                 x_axis, 

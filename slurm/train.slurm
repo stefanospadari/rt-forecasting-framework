@@ -15,7 +15,7 @@ set -euo pipefail
 COMMON="${SLURM_SUBMIT_DIR:-$PWD}/slurm/_common.sh"
 [ -f "$COMMON" ] || { echo "ERROR: run sbatch from the project root (not found: $COMMON)"; exit 1; }
 source "$COMMON"
-: "${METRIC:?set METRIC=co2|temperature|humidity with --export}"
+: "${METRIC:?set METRIC=<one of data.metrics in the config> with --export}"
 CONFIG=${CONFIG:-configs/base.yaml}
 [ -f "$CONFIG" ] || { echo "ERROR: config not found: $CONFIG"; exit 1; }
 
