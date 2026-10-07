@@ -16,7 +16,7 @@ T_update(one new sample) + T_forecast(H)  ≤  Δt
 Everything that defines an experiment — which series (rooms), which metrics, which
 models and hyper-parameters, horizons, sampling interval, number of evaluation
 points — lives in a YAML config. The reference setup (`configs/base.yaml`) uses the
-public [KETI smart-building dataset](https://www.kaggle.com/datasets/ranakrc/smart-building-system), but any dataset with the same file layout works
+public KETI smart-building dataset, but any dataset with the same file layout works
 (see [Using your own data](#using-your-own-data)).
 
 ## Layout
@@ -340,7 +340,7 @@ Without this separation, the update latency would include the cost of catching u
 gap of tens or hundreds of points, inflating it by orders of magnitude (observed during
 development: from ~8.4 s to ~34 ms on ARIMA_311).
 
-`latency_stats_from_preds` computes update / predict / total statistics on the same set
-of origins (the first, cold-start origin, where no update happened, is excluded), so
-that `mean(total) == mean(update) + mean(predict)` always holds exactly — a quick
-sanity check that nothing is broken.
+Forecast origins start at the second test sample, so **every origin is a complete
+real-time cycle** (one new sample → timed update → timed forecast) and all `n_origins`
+cycles enter both the accuracy and the latency statistics; by construction
+`mean(total) == mean(update) + mean(predict)`, a quick sanity check that nothing is broken.

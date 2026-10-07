@@ -34,10 +34,10 @@ def latency_stats_from_preds(preds):
     """
     Compute latency statistics for update, prediction, and total cycle.
 
-    update/predict/total sono calcolate sullo stesso insieme di forecast
-    origin (si esclude il primo origin, dove nessun update e' avvenuto),
-    cosi' le tre statistiche restano internamente coerenti
-    (mean(total) == mean(update) + mean(predict)).
+    update/predict/total are computed on the same set of forecast origins
+    (any origin without an update is excluded; with origins starting at
+    position 1 there is none), so the three statistics stay consistent:
+    mean(total) == mean(update) + mean(predict).
 
     Returns
     -------
@@ -114,10 +114,15 @@ def rolling_predict(
 
     n_predictions = min(n_predictions, n_rolls_full)
 
-    # Evenly spaced forecast origins
+    # Evenly spaced forecast origins. The first one is at position 1 (not 0),
+    # so that every origin is a complete real-time cycle: one new sample
+    # arrives -> timed update -> timed forecast. With origin 0 the model would
+    # forecast without any new sample, and that cycle would have no update.
+    first = 1 if n_rolls_full > 1 else 0
+    n_predictions = min(n_predictions, n_rolls_full - first)
     target_positions = np.unique(
         np.linspace(
-            0,
+            first,
             n_rolls_full - 1,
             n_predictions,
             dtype=int
@@ -304,7 +309,7 @@ def plot_rolling_forecast(
                 alpha=0.8
             )
         else:
-            print(f"Errore lunghezze: X è {len(x_axis)}, Y è {len(y_axis)}")
+            print(f"Length mismatch: X has {len(x_axis)}, Y has {len(y_axis)}")
 
     plt.title(title or "Rolling Forecast")
     plt.grid(alpha=0.3)
