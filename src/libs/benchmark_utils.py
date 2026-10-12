@@ -76,6 +76,23 @@ def latency_stats_from_preds(preds):
 
     return results
 
+def forecast_origin_positions(n_test: int, H: int, n_predictions: int) -> np.ndarray:
+    """Positions (in the test series) of the evenly spaced forecast origins.
+
+    The first origin is at position 1 (not 0), so that every origin is a
+    complete real-time cycle: one new sample arrives -> timed update -> timed
+    forecast. With origin 0 the model would forecast without any new sample,
+    and that cycle would have no update. Shared by rolling_predict and
+    oracle_rolling_predict so that both use the same origins.
+    """
+    n_rolls_full = n_test - H + 1
+    if n_rolls_full <= 0:
+        raise ValueError("Test series too short for selected horizon H.")
+    first = 1 if n_rolls_full > 1 else 0
+    n_predictions = max(1, min(n_predictions, n_rolls_full - first))
+    return np.unique(np.linspace(first, n_rolls_full - 1, n_predictions, dtype=int))
+
+
 def rolling_predict(
     model,
     test_series,
@@ -114,20 +131,7 @@ def rolling_predict(
 
     n_predictions = min(n_predictions, n_rolls_full)
 
-    # Evenly spaced forecast origins. The first one is at position 1 (not 0),
-    # so that every origin is a complete real-time cycle: one new sample
-    # arrives -> timed update -> timed forecast. With origin 0 the model would
-    # forecast without any new sample, and that cycle would have no update.
-    first = 1 if n_rolls_full > 1 else 0
-    n_predictions = min(n_predictions, n_rolls_full - first)
-    target_positions = np.unique(
-        np.linspace(
-            first,
-            n_rolls_full - 1,
-            n_predictions,
-            dtype=int
-        )
-    )
+    target_positions = forecast_origin_positions(len(test_series), H, n_predictions)
 
     model_copy = model.copy()
 
@@ -382,6 +386,87 @@ def evaluate_rolling_forecast(
         raise ValueError("No valid forecast rows could be evaluated (check indices and horizon).")
 
     return float(reduce_fn(scores))
+
+
+def oracle_rolling_predict(model, test_series: pd.Series, origins_by_H: dict) -> dict:
+    """Oracle ("teacher forcing") multi-step forecasts.
+
+    For every forecast origin p and every step h = 1..H the model predicts ONE
+    step ahead, and before step h+1 its state is updated with the TRUE value
+    observed at step h (not with its own prediction). Step h of the oracle
+    trajectory is therefore the one-step-ahead forecast of y[p+h-1] given all
+    true observations before it.
+
+    Because of this, the oracle forecast of a position does not depend on the
+    origin it belongs to: the function walks the test series once, forecasting
+    one step ahead at every position that is needed and updating the model with
+    the true values in between (untimed: latencies of this test are not
+    representative of a deployment and are not measured).
+
+    Parameters
+    ----------
+    model : forecaster with predict(1), update(series) and copy()
+    test_series : pd.Series
+    origins_by_H : dict {H: iterable of origin positions in test_series}
+
+    Returns
+    -------
+    dict {H: pd.DataFrame}, same layout as rolling_predict:
+        index = forecast_origin (timestamp of step h1), columns h1..hH
+    """
+    n = len(test_series)
+    needed = set()
+    for H, positions in origins_by_H.items():
+        for p in positions:
+            if p + H > n:
+                raise ValueError(f"Origin {p} with H={H} goes beyond the test series.")
+            needed.update(range(int(p), int(p) + int(H)))
+
+    m = model.copy()
+    one_step = {}
+    cur = 0  # first test position not yet given to the model
+    for q in sorted(needed):
+        if q > cur:
+            m.update(test_series.iloc[cur:q])   # true values up to q-1
+            cur = q
+        one_step[q] = float(np.asarray(m.predict(1)).reshape(-1)[0])
+
+    out = {}
+    for H, positions in origins_by_H.items():
+        positions = [int(p) for p in positions]
+        out[H] = pd.DataFrame(
+            data=[[one_step[p + h] for h in range(H)] for p in positions],
+            index=pd.Index(test_series.index[positions], name="forecast_origin"),
+            columns=[f"h{h}" for h in range(1, H + 1)],
+        )
+    return out
+
+
+def per_origin_errors(test_series: pd.Series, forecast_df: pd.DataFrame) -> pd.DataFrame:
+    """MAE, RMSE, MAPE (%) and sMAPE (%) of every forecast row (origin).
+
+    Mean and variance over origins can then be taken directly on the result.
+    """
+    H = forecast_df.shape[1]
+    rows = []
+    for origin, row in forecast_df.iterrows():
+        pos = test_series.index.get_loc(origin)
+        y = test_series.iloc[pos:pos + H].to_numpy(dtype=float)
+        yhat = row.to_numpy(dtype=float)
+        if len(y) != H:
+            continue
+        err = yhat - y
+        with np.errstate(divide="ignore", invalid="ignore"):
+            mape = np.nanmean(np.abs(err) / np.abs(y)) * 100.0
+            smape_v = np.nanmean(2.0 * np.abs(err) / (np.abs(y) + np.abs(yhat))) * 100.0
+        rows.append({
+            "forecast_origin": origin,
+            "mae": float(np.mean(np.abs(err))),
+            "rmse": float(np.sqrt(np.mean(err ** 2))),
+            "mape": float(mape),
+            "smape": float(smape_v),
+        })
+    return pd.DataFrame(rows).set_index("forecast_origin")
 
 
 class RealTimeForecaster:
